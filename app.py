@@ -233,16 +233,20 @@ def insert_patient():
     return jsonify(results)
 
 
-@app.route('/qibs', methods=['GET'])
+
+
+
+@app.route('/qibs/', methods=['GET'])
 def get_qibs():
-    all_qibs = QIB.query.all()
-    results = qibs_schema.dump(all_qibs)
-    return jsonify(results)
-
-
-@app.route('/qibs/<album_id>', methods=['GET'])
-def get_qibs_by_album(album_id):
-    all_qibs = QIB.query.filter_by(idAlbum=album_id).all()
+    album = request.args.get('album', default = 0, type = int)
+    date = request.args.get('date', default = '*', type = str)
+    print(datetime.now())
+    if(album!=0 and date==''):
+        all_qibs = QIB.query.filter_by(idAlbum=album).all()
+    elif(album==0 and date!='*'):
+        all_qibs = QIB.query.filter(QIB.timeStamp>=datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f')).all()
+    else:
+        all_qibs = QIB.query.all()
     results = qibs_schema.dump(all_qibs)
     return jsonify(results)
 
@@ -281,21 +285,19 @@ def get_albums_test():
     results = albums_schema.dump(all_albums)
     return jsonify(results)
 
-# get all albums belonging to study 1
-@app.route('/uploadCSV', methods=['GET'])
-def insert_feature():
-    add_features(data)
-    add_modalities(data)
-    add_patients(data)
-    add_labels(data)
-    qibID = add_qib()
-    add_qib_features(data, qibID)
-    all_features = Feature.query.all()
-    results = features_schema.dump(all_features)
-    return jsonify(results)
+
+@app.route('/upload_csv', methods=['POST'])
+def upload_csv():
+    try:
+        if request.method == 'POST' and request.files:
+            data = pd.read_csv(request.files['csv-file'])
+            load_csv_to_db(data)
+            return 'Upload ok'
+    except Exception:
+        return 'Upload failed'
 
 
-@app.route('/testy', methods=['GET'])
+@app.route('/test', methods=['GET'])
 def get_qib_features_testy():
     all_qib_features = QIBFeature.query.all()
     results = qib_features_schema.dump(all_qib_features)
@@ -304,6 +306,17 @@ def get_qib_features_testy():
 
 ######################################
 # helper funcs
+def load_csv_to_db(data):
+    try:
+        add_features(data)
+        add_modalities(data)
+        add_patients(data)
+        add_labels(data)
+        qibID = add_qib()
+        add_qib_features(data, qibID)
+        return True
+    except Exception:
+        return False
 
 
 def add_qib():
