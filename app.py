@@ -6,6 +6,7 @@ from pandas import pandas as pd
 from flask_cors import CORS
 import pymysql
 import dbparams
+import models
 import os
 import json
 
@@ -22,140 +23,10 @@ ma = Marshmallow(app)
 CORS(app)
 data = pd.read_csv("./csv/features_texture.csv")
 # print(data.columns)
+
+
 #########################################
-# Classes
-
-
-class Patient(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    firstName = db.Column(db.String(100))
-    lastName = db.Column(db.String(100))
-    birthdate = db.Column(db.DateTime)
-    gender = db.Column(db.String(2))
-    studies = db.relationship('Study', backref='Study')
-    labels = db.relationship('Label', backref='Label')
-
-    def __init__(self, first_name, last_name, birthdate, gender):
-        self.firstName = first_name
-        self.lastName = last_name
-        self.birthdate = birthdate
-        self.gender = gender
-
-
-StudyAlbum = db.Table('study_album',
-                      db.Column('idStudy', db.Integer, db.ForeignKey(
-                          'study.id'), primary_key=True),
-                      db.Column('idAlbum', db.Integer, db.ForeignKey(
-                          'album.id'), primary_key=True)
-                      )
-
-
-class Study(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    timeStamp = db.Column(db.DateTime)
-    idPatient = db.Column(db.Integer, db.ForeignKey(
-        'patient.id'))
-    series = db.relationship('Series', backref='SeriesS')
-    albums = db.relationship('Album', backref='Study_to_Album',
-                             lazy='dynamic', secondary=StudyAlbum)
-
-
-class Album(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    description = db.Column(db.String(100))
-    timeStamp = db.Column(db.DateTime)
-    qibs = db.relationship('QIB', backref='QIB')
-    studies = db.relationship('Study', backref='Album_to_Study',
-                              lazy='dynamic', secondary=StudyAlbum)
-
-
-class Modality(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    description = db.Column(db.String(100))
-    series = db.relationship('Series', backref='SeriesM')
-
-    def __init__(self, name, description):
-        self.name = name
-        self.description = description
-
-
-class Series(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    timeStamp = db.Column(db.DateTime)
-    idStudy = db.Column(db.Integer, db.ForeignKey(
-        'study.id'))
-    idModality = db.Column(db.Integer, db.ForeignKey(
-        'modality.id'))
-    images = db.relationship('Image', backref='Image')
-
-
-class Image(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    timeStamp = db.Column(db.DateTime)
-    location = db.Column(db.Integer)
-    thickness = db.Column(db.Integer)
-    idSeries = db.Column(db.Integer, db.ForeignKey(
-        'series.id'))
-
-
-class Label(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    description = db.Column(db.String(100))
-    idPatient = db.Column(db.Integer, db.ForeignKey(
-        'patient.id'))
-
-    def __init__(self, name, description):
-        self.name = name
-        self.description = description
-
-
-class Family(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    features = db.relationship('Feature', backref='Feature')
-
-
-class Feature(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100))
-    idFamily = db.Column(db.Integer, db.ForeignKey(
-        'family.id'))
-
-    def __init__(self, name, id_family):
-        self.name = name
-        self.idFamily = id_family
-
-
-class QIB(db.Model):
-    __tablename__ = 'qib'
-    id = db.Column(db.Integer, primary_key=True)
-    timeStamp = db.Column(db.DateTime)
-    idAlbum = db.Column(db.Integer, db.ForeignKey(
-        'album.id'))
-
-    def __init__(self, time_stamp, id_album):
-        self.timeStamp = time_stamp
-        self.idAlbum = id_album
-
-
-class QIBFeature(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    idQIB = db.Column(db.Integer, db.ForeignKey('qib.id'))
-    idFeature = db.Column(db.Integer, db.ForeignKey(
-        'feature.id'))
-    featureValue = db.Column(db.Float)
-    feature = db.relationship('Feature', backref='Feature1')
-    qib = db.relationship('QIB', backref='QIB1')
-
-    def __init__(self, id_qib, id_feature, value):
-        self.idQIB = id_qib
-        self.idFeature = id_feature
-        self.featureValue = value
-
-
+# Schema
 class PatientSchema(ma.Schema):
     class Meta:
         fields = ('id', 'firstName', 'lastName', 'birthdate', 'gender')
@@ -183,10 +54,9 @@ class QIBSchema(ma.Schema):
 
 class QIBFeatureSchema(ma.ModelSchema):
     class Meta:
-        model = QIBFeature
+        fields = ('id', 'idQIB', 'idFeature', 'featureValue', 'feature', 'qib')
     feature = ma.Nested(FeatureSchema)
     qib = ma.Nested(QIBSchema)
-
 
 patient_schema = PatientSchema()
 patients_schema = PatientSchema(many=True)
@@ -211,80 +81,8 @@ study_albums_schema = StudyAlbumSchema(many=True)
 # Endpoints
 @app.route('/', methods=['GET'])
 def get():
-    print('console got!')
+    print('Hello!')
     return jsonify({'test': current_dir})
-
-
-@app.route('/insertPatient', methods=['POST'])
-def insert_patient():
-    data = request.json
-    print(data["birthdate"])
-    pa_search = Patient.query.filter_by(
-        firstName=data["firstName"], lastName=data["lastName"], birthdate=data["birthdate"], gender=data["gender"]).first()
-    if pa_search is None:
-        pa = Patient(data["firstName"], data["lastName"],
-                     data["birthdate"], data["gender"])
-        db.session.add(pa)
-        db.session.commit()
-        db.session.refresh(pa)
-    print(pa.id)
-    all_patients = Patient.query.all()
-    results = patients_schema.dump(all_patients)
-    return jsonify(results)
-
-
-
-
-
-@app.route('/qibs/', methods=['GET'])
-def get_qibs():
-    album = request.args.get('album', default = 0, type = int)
-    date = request.args.get('date', default = '*', type = str)
-    print(datetime.now())
-    if(album!=0 and date==''):
-        all_qibs = QIB.query.filter_by(idAlbum=album).all()
-    elif(album==0 and date!='*'):
-        all_qibs = QIB.query.filter(QIB.timeStamp>=datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f')).all()
-    else:
-        all_qibs = QIB.query.all()
-    results = qibs_schema.dump(all_qibs)
-    return jsonify(results)
-
-
-@app.route('/qib_features', methods=['GET'])
-def get_qib_features():
-    all_qib_features = QIBFeature.query.all()
-    results = qib_features_schema.dump(all_qib_features)
-    return jsonify(results)
-
-
-@app.route('/qib_features/<qib_id>', methods=['GET'])
-def get_qib_features_by_qib(qib_id):
-    all_qib_features = QIBFeature.query.filter_by(idQIB=qib_id).all()
-    results = qib_features_schema.dump(all_qib_features)
-    return jsonify(results)
-
-
-@app.route('/features', methods=['GET'])
-def get_features():
-    all_features = Feature.query.all()
-    results = features_schema.dump(all_features)
-    return jsonify(results)
-
-
-@app.route('/albums', methods=['GET'])
-def get_albums():
-    all_albums = Album.query.all()
-    results = albums_schema.dump(all_albums)
-    return jsonify(results)
-
-# get all albums belongingto study 1
-@app.route('/albumtest', methods=['GET'])
-def get_albums_test():
-    all_albums = Album.query.filter(Album.studies.any(id=1)).all()
-    results = albums_schema.dump(all_albums)
-    return jsonify(results)
-
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
@@ -297,9 +95,63 @@ def upload_csv():
         return 'Upload failed'
 
 
+@app.route('/qibs/', methods=['GET'])
+def get_qibs():
+    album = request.args.get('album', default = 0, type = int)
+    date = request.args.get('date', default = '*', type = str)
+    print(datetime.now())
+    if(album!=0 and date==''):
+        all_qibs = models.QIB.query.filter_by(idAlbum=album).all()
+    elif(album==0 and date!='*'):
+        all_qibs = models.QIB.query.filter(models.QIB.timeStamp>=datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f')).all()
+    else:
+        all_qibs = models.QIB.query.all()
+    results = qibs_schema.dump(all_qibs)
+    return jsonify(results)
+
+
+@app.route('/qib_features', methods=['GET'])
+def get_qib_features():
+    all_qib_features = models.QIBFeature.query.all()
+    results = qib_features_schema.dump(all_qib_features)
+    return jsonify(results)
+
+
+@app.route('/qib_features/<qib_id>', methods=['GET'])
+def get_qib_features_by_qib(qib_id):
+    all_qib_features = models.QIBFeature.query.filter_by(idQIB=qib_id).all()
+    results = qib_features_schema.dump(all_qib_features)
+    return jsonify(results)
+
+@app.route('/generate_feature_set/<qib_id>', methods=['POST'])
+def generate_csv(qib_id):
+    data = request.json
+    feature_list = data["feature_list"] 
+    feature_dict = {}
+    all_qib_features = models.QIBFeature.query.filter_by(idQIB=qib_id).all()
+    current_feature_name = ''
+    for qb in all_qib_features:
+        if(qb.feature.name != current_feature_name):
+            current_feature_name = qb.feature.name
+            if current_feature_name in feature_list:
+                feature_dict[current_feature_name] = []
+        if current_feature_name in feature_dict:
+            feature_dict[current_feature_name].append(qb.featureValue)
+    df = pd.DataFrame(data=feature_dict)
+    print(f"./data/{str(datetime.now())}.csv")
+    df.to_csv(current_dir + f"\\data\\{str(datetime.now().timestamp())}.csv", index=False)
+    return 'OK'
+
+
+
+
+
+
+
+
 @app.route('/test', methods=['GET'])
 def get_qib_features_testy():
-    all_qib_features = QIBFeature.query.all()
+    all_qib_features = models.QIBFeature.query.all()
     results = qib_features_schema.dump(all_qib_features)
     return jsonify(results)
 
@@ -320,7 +172,7 @@ def load_csv_to_db(data):
 
 
 def add_qib():
-    qib = QIB(datetime.now(), 1)
+    qib = models.QIB(datetime.now(), 1)
     db.session.add(qib)
     db.session.commit()
     db.session.refresh(qib)
@@ -329,20 +181,20 @@ def add_qib():
 
 def add_qib_features(data, qibID):
     for i in data.columns:
-        feature_search = Feature.query.filter_by(name=i).first()
+        feature_search = models.Feature.query.filter_by(name=i).first()
         if feature_search != None:
             print(feature_search.id)
             for a in data[i]:
-                qf = QIBFeature(qibID, feature_search.id, a)
+                qf = models.QIBFeature(qibID, feature_search.id, a)
                 db.session.add(qf)
                 db.session.commit()
 
 
 def add_features(data):
     for i in data.columns:
-        feature_search = Feature.query.filter_by(name=i).first()
+        feature_search = models.Feature.query.filter_by(name=i).first()
         if feature_search is None and i not in ['patientID', 'modality', 'label']:
-            fe = Feature(i, 1)
+            fe = models.Feature(i, 1)
             db.session.add(fe)
             db.session.commit()
             db.session.refresh(fe)
@@ -350,9 +202,9 @@ def add_features(data):
 
 def add_modalities(data):
     for i in data["modality"]:
-        modality_search = Modality.query.filter_by(name=i).first()
+        modality_search = models.Modality.query.filter_by(name=i).first()
         if modality_search is None:
-            mo = Modality(i, "To be updated")
+            mo = models.Modality(i, "To be updated")
             db.session.add(mo)
             db.session.commit()
 
@@ -362,10 +214,10 @@ def add_patients(data):
         extracted_name = i[:i.index("_")].split(' ')
         first_name = extracted_name[0]
         last_name = extracted_name[1]
-        pa_search = Patient.query.filter_by(
+        pa_search = models.Patient.query.filter_by(
             firstName=first_name, lastName=last_name).first()
         if pa_search is None:
-            pa = Patient(first_name, last_name, "2000-01-01", "F")
+            pa = models.Patient(first_name, last_name, "2000-01-01", "F")
             db.session.add(pa)
             db.session.commit()
 
@@ -375,13 +227,13 @@ def add_labels(data):
         extracted_name = row.patientID[:row.patientID.index("_")].split(' ')
         first_name = extracted_name[0]
         last_name = extracted_name[1]
-        pa_search = Patient.query.filter_by(
+        pa_search = models.Patient.query.filter_by(
             firstName=first_name, lastName=last_name).first()
         if pa_search != None:
-            label_search = Label.query.filter_by(
+            label_search = models.Label.query.filter_by(
                 idPatient=pa_search.id).first()
             if label_search is None:
-                lb = Label(row.label, "To be updated")
+                lb = models.Label(row.label, "To be updated")
                 lb.idPatient = pa_search.id
                 db.session.add(lb)
                 db.session.commit()
@@ -393,11 +245,45 @@ if __name__ == '__main__':
     app.run(debug=True)
 
 
-# class QIBFeatureSchema(ma.Schema):
-#     class Meta:
-#         fields = ('idQIB', 'idFeature', 'value')
 
-# qib_feature_schema = QIBFeatureSchema()
-# qib_features_schema = QIBFeatureSchema(many=True)
 
-# Column('last_updated', DateTime, onupdate=datetime.datetime.now),
+
+
+
+
+# @app.route('/features', methods=['GET'])
+# def get_features():
+#     all_features = models.Feature.query.all()
+#     results = features_schema.dump(all_features)
+#     return jsonify(results)
+
+
+# @app.route('/albums', methods=['GET'])
+# def get_albums():
+#     all_albums = models.Album.query.all()
+#     results = albums_schema.dump(all_albums)
+#     return jsonify(results)
+
+# # get all albums belongingto study 1
+# @app.route('/albumtest', methods=['GET'])
+# def get_albums_test():
+#     all_albums = models.Album.query.filter(models.Album.studies.any(id=1)).all()
+#     results = albums_schema.dump(all_albums)
+#     return jsonify(results)
+
+# @app.route('/insertPatient', methods=['POST'])
+# def insert_patient():
+#     data = request.json
+#     print(data["birthdate"])
+#     pa_search = models.Patient.query.filter_by(
+#         firstName=data["firstName"], lastName=data["lastName"], birthdate=data["birthdate"], gender=data["gender"]).first()
+#     if pa_search is None:
+#         pa = models.Patient(data["firstName"], data["lastName"],
+#                      data["birthdate"], data["gender"])
+#         db.session.add(pa)
+#         db.session.commit()
+#         db.session.refresh(pa)
+#     print(pa.id)
+#     all_patients = models.Patient.query.all()
+#     results = patients_schema.dump(all_patients)
+#     return jsonify(results)
