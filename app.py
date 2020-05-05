@@ -147,6 +147,8 @@ class QIBFeature(db.Model):
     idFeature = db.Column(db.Integer, db.ForeignKey(
         'feature.id'))
     featureValue = db.Column(db.Float)
+    feature = db.relationship('Feature', backref='Feature1')
+    qib = db.relationship('QIB', backref='QIB1')
 
     def __init__(self, id_qib, id_feature, value):
         self.idQIB = id_qib
@@ -179,9 +181,11 @@ class QIBSchema(ma.Schema):
         fields = ('id', 'timeStamp', 'idAlbum')
 
 
-class QIBFeatureSchema(ma.Schema):
+class QIBFeatureSchema(ma.ModelSchema):
     class Meta:
-        fields = ('idQIB', 'idFeature', 'featureValue')
+        model = QIBFeature
+    feature = ma.Nested(FeatureSchema)
+    qib = ma.Nested(QIBSchema)
 
 
 patient_schema = PatientSchema()
@@ -283,6 +287,7 @@ def insert_feature():
     add_features(data)
     add_modalities(data)
     add_patients(data)
+    add_labels(data)
     qibID = add_qib()
     add_qib_features(data, qibID)
     all_features = Feature.query.all()
@@ -290,9 +295,11 @@ def insert_feature():
     return jsonify(results)
 
 
-@app.route('/getPatLab', methods=['GET'])
-def get_pat_lab():
-    add_labels(data)
+@app.route('/testy', methods=['GET'])
+def get_qib_features_testy():
+    all_qib_features = QIBFeature.query.all()
+    results = qib_features_schema.dump(all_qib_features)
+    return jsonify(results)
 
 
 ######################################
@@ -351,18 +358,23 @@ def add_patients(data):
 
 
 def add_labels(data):
-    for i in (data["patientID"], data["modality"]):
-        print(i[0])
-        print(i[1])
+    for index, row in data.iterrows():
+        extracted_name = row.patientID[:row.patientID.index("_")].split(' ')
+        first_name = extracted_name[0]
+        last_name = extracted_name[1]
+        pa_search = Patient.query.filter_by(
+            firstName=first_name, lastName=last_name).first()
+        if pa_search != None:
+            label_search = Label.query.filter_by(
+                idPatient=pa_search.id).first()
+            if label_search is None:
+                lb = Label(row.label, "To be updated")
+                lb.idPatient = pa_search.id
+                db.session.add(lb)
+                db.session.commit()
 
-    # label_search = Label.query.filter_by(name=i).first()
-    # if label_search is None:
-    #     lb = Label(i, "To be updated")
-    #     db.session.add(lb)
-    #     db.session.commit()
+
 ###################################################################
-
-
 # Run server
 if __name__ == '__main__':
     app.run(debug=True)
