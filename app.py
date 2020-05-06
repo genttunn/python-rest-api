@@ -100,8 +100,8 @@ def get_qibs():
     album = request.args.get('album', default = 0, type = int)
     date = request.args.get('date', default = '*', type = str)
     print(datetime.now())
-    if(album!=0 and date==''):
-        all_qibs = models.QIB.query.filter_by(idAlbum=album).all()
+    if(album!=0 and date=='*'):
+        all_qibs = models.QIB.query.filter(models.QIB.idAlbum==album).all()
     elif(album==0 and date!='*'):
         all_qibs = models.QIB.query.filter(models.QIB.timeStamp>=datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f')).all()
     else:
@@ -120,8 +120,22 @@ def get_qib_features():
 @app.route('/qib_features/<qib_id>', methods=['GET'])
 def get_qib_features_by_qib(qib_id):
     all_qib_features = models.QIBFeature.query.filter_by(idQIB=qib_id).all()
-    results = qib_features_schema.dump(all_qib_features)
-    return jsonify(results)
+    df = convert_to_df(all_qib_features)
+    jsonRes = df.to_json()
+    # results = qib_features_schema.dump(all_qib_features)
+    return jsonRes
+
+def convert_to_df(qib_feature_set):
+    current_feature_name = ''
+    feature_dict = {}
+    for qb in qib_feature_set:
+        if(qb.feature.name != current_feature_name):
+            current_feature_name = qb.feature.name
+            feature_dict[current_feature_name] = []
+        if current_feature_name in feature_dict:
+            feature_dict[current_feature_name].append(qb.featureValue)
+    df = pd.DataFrame(data=feature_dict)
+    return df
 
 @app.route('/generate_feature_set/<qib_id>', methods=['POST'])
 def generate_csv(qib_id):
@@ -138,13 +152,18 @@ def generate_csv(qib_id):
         if current_feature_name in feature_dict:
             feature_dict[current_feature_name].append(qb.featureValue)
     df = pd.DataFrame(data=feature_dict)
-    print(f"./data/{str(datetime.now())}.csv")
-    df.to_csv(current_dir + f"\\data\\{str(datetime.now().timestamp())}.csv", index=False)
-    return 'OK'
+    file=current_dir + f"\\data\\{str(datetime.now().timestamp())}.csv"
+    df.to_csv(file, index=False)
+    return file
 
 
 
 
+@app.route('/albums', methods=['GET'])
+def get_albums():
+    all_albums = models.Album.query.all()
+    results = albums_schema.dump(all_albums)
+    return jsonify(results)
 
 
 
