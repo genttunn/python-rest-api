@@ -1,5 +1,5 @@
 # db config
-dbparams.py
+feature_manager/dbparams.py
 
 #feature set
 data/
