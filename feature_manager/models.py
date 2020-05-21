@@ -42,6 +42,12 @@ class Modality(db.Model):
     name = db.Column(db.String(100))
     description = db.Column(db.String(100))
 
+    # id_qib_feature = db.Column(db.Integer, db.ForeignKey('qib_feature.id'))
+    # id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
+    
+    # qib_feature = db.relationship('QIBFeature',backref='modality')
+    # patient  =  db.relationship('Patient',backref='modality')
+
 
 class Series(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -61,11 +67,11 @@ class Region(db.Model):
     name = db.Column(db.String(100))
     description = db.Column(db.String(100))
 
-    id_qib_feature = db.Column(db.Integer, db.ForeignKey('qib_feature.id'))
-    id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
+    # id_qib_feature = db.Column(db.Integer, db.ForeignKey('qib_feature.id'))
+    # id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
     
-    qib_feature = db.relationship('QIBFeature',backref='region')
-    patient  =  db.relationship('Patient',backref='region')
+    # qib_feature = db.relationship('QIBFeature',backref='region')
+    # patient  =  db.relationship('Patient',backref='region')
 
 class Outcome(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -75,6 +81,9 @@ class Outcome(db.Model):
 
     id_region = db.Column(db.Integer, db.ForeignKey('region.id'))
     region = db.relationship('Region', backref='outcome')
+
+    id_patient = db.Column(db.Integer, db.ForeignKey('patient.id'))
+    patient = db.relationship('Patient', backref='outcome')
 
 class Family(db.Model):
     id = db.Column(db.Integer, primary_key=True)
@@ -106,7 +115,10 @@ class QIBFeature(db.Model):
     id_qib = db.Column(db.Integer, db.ForeignKey('qib.id'))
     id_feature = db.Column(db.Integer, db.ForeignKey(
         'feature.id'))
+    id_series = db.Column(db.Integer, db.ForeignKey(
+        'series.id'))
     
     feature = db.relationship('Feature', backref='qib_feature')
     qib = db.relationship('QIB',backref='qib_feature')
+    series = db.relationship('Series',backref='qib_feature')
 

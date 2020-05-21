@@ -1,6 +1,6 @@
 from feature_manager.models import *
 
-def test_insert():
-    family = Family(name='test')
+def insert_family():
+    family = Family(name='texture')
     db.session.add(family)
     db.session.commit()

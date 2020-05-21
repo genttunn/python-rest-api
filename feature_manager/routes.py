@@ -1,7 +1,9 @@
 from feature_manager import app, jsonify,request
 from feature_manager.models import *
 from feature_manager.schemas import *
+from pandas import pandas as pd
 import json
+
 family_schema = FamilySchema()
 families_schema = FamilySchema(many=True)
 feature_schema = FeatureSchema()
@@ -16,6 +18,8 @@ album_schema = AlbumSchema()
 albums_schema = AlbumSchema(many=True)
 study_album_schema = StudyAlbumSchema()
 study_albums_schema = StudyAlbumSchema(many=True)
+
+data = pd.read_csv("./csv/features_intensity.csv")
 
 @app.route("/", methods=['GET'])
 def hey():
@@ -60,3 +64,50 @@ def yoi():
     study = album.study_albums[0].study
     results =study_schema.dump(study)
     return jsonify(results)
+
+
+
+
+################# Helper functions #####################
+
+def get_album_by_name_commited(album_name):
+    album = Album.query.filter_by(name = album_name).first()
+    if feature_search is None:
+        album = Album(album_name,'To be updated')
+        db.session.add(album)
+        db.session.commit()
+        db.session.refresh(album) #get album.id
+    return album
+
+def add_qib_for_album_commited(album_id):
+    qib = QIB(album_id)
+    db.session.add(qib)
+    db.session.commit()
+    db.session.refresh(qib)
+    return qib
+
+def add_modalities(data):
+    for i in data["modality"]:
+        modality = Modality.query.filter_by(name=i).first()
+        if modality is None:
+            modality = Modality(i, "To be updated")
+            db.session.add(modality)
+
+def add_regions(data):
+    for i in data["label"]:
+        region = Region.query.filter_by(name=i).first()
+        if region is None:
+            region = Region(i, "To be updated")
+            db.session.add(region)
+
+def add_patients(data):
+    patient_frame = data.groupby(['patientID']).mean()
+    for i in patient_frame["patientID"]:
+        extracted_name = i[:i.index("_")].split(' ')
+        first_name = extracted_name[0]
+        last_name = extracted_name[1]
+        patient = Patient.query.filter_by(first_name=first_name, last_name=last_name).first()
+        if patient is None:
+            patient = Patient(first_name, last_name, "2000-01-01", "F")
+            db.session.add(patient)
+            
