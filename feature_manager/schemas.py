@@ -27,7 +27,7 @@ class PatientSchema(ma.Schema):
 
 class StudySchema(ma.Schema):
     class Meta:
-        fields = ('id', 'patient', 'time_stamp')
+        fields = ('id','name', 'id_patient','patient', 'time_stamp')
     patient = ma.Nested(PatientSchema)
 
 class QIBSchema(ma.Schema):

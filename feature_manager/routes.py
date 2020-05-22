@@ -60,6 +60,15 @@ def get_qib_features_by_qib(qib_id):
         results.append(new_dict)
     return jsonify(results)
 
+@app.route('/studies/<album_id>', methods=['GET'])
+def get_studies_by_album(album_id):
+    studies = []
+    study_albums = StudyAlbum.query.filter_by(id_album=album_id).all()
+    for sa in study_albums:
+        study = sa.study
+        studies.append(study)
+    results = studies_schema.dump(studies)
+    return jsonify(results)
 
 @app.route('/generate_csv/<qib_id>', methods=['POST'])
 def generate_csv_by_feature(qib_id):
@@ -70,6 +79,25 @@ def generate_csv_by_feature(qib_id):
     res = {}
     res['path'] = file_dir
     return  jsonify(res)
+
+@app.route('/upload_csv', methods=['POST'])
+def upload_csv():
+    try:
+        album_name=''
+        family=''
+        if request.form:
+            album_name = request.form['album_name']
+            family = request.form['family']
+            print(album_name + "  " + family)
+        if request.method == 'POST' and request.files:
+            print('yes')
+            data = pd.read_csv(request.files['file'])
+            load_file_to_db(data,album_name,family)
+            print(request.files)
+            print(data)
+            return 'Upload ok'
+    except Exception:
+        return 'Upload failed'
 
 @app.route("/", methods=['GET'])
 def hello():
