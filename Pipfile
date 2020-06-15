@@ -11,6 +11,7 @@ flask-sqlalchemy = "*"
 flask-marshmallow = "*"
 pandas = "*"
 flask-cors = "*"
+pydicom = "*"
 
 [requires]
 python_version = "3.8"

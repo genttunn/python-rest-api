@@ -11,21 +11,21 @@ class Patient(db.Model):
     gender = db.Column(db.String(2))
 
 
-class Study(db.Model):
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(300))
-    id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
-    time_stamp = db.Column(db.DateTime, default = datetime.now())
-    patient = db.relationship('Patient', backref='study')
+# class Study(db.Model):
+#     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+#     name = db.Column(db.String(300))
+#     id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
+#     time_stamp = db.Column(db.DateTime, default = datetime.now())
+#     patient = db.relationship('Patient', backref='study')
 
 
 
-class StudyAlbum(db.Model):
-    id_study = db.Column(db.Integer, db.ForeignKey('study.id'),primary_key=True)
-    id_album = db.Column(db.Integer, db.ForeignKey(
-        'album.id'),primary_key=True)
-    study = db.relationship('Study', backref='study_album')
-    album = db.relationship('Album', backref='study_album')
+# class StudyAlbum(db.Model):
+#     id_study = db.Column(db.Integer, db.ForeignKey('study.id'),primary_key=True)
+#     id_album = db.Column(db.Integer, db.ForeignKey(
+#         'album.id'),primary_key=True)
+#     study = db.relationship('Study', backref='study_album')
+#     album = db.relationship('Album', backref='study_album')
 
 class Album(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -44,15 +44,32 @@ class Modality(db.Model):
     description = db.Column(db.String(100),default = 'To be updated')
 
 
+class Study(db.Model):
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    name = db.Column(db.String(300))
+    time_stamp = db.Column(db.DateTime, default = datetime.now())
+    id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
+    patient = db.relationship('Patient', backref='study')
+
+class StudyAlbum(db.Model):
+    id_study = db.Column(db.Integer, db.ForeignKey('study.id'),primary_key=True)
+    id_album = db.Column(db.Integer, db.ForeignKey(
+        'album.id'),primary_key=True)
+    study = db.relationship('Study', backref='study_album')
+    album = db.relationship('Album', backref='study_album')
+
+
 class Series(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     time_stamp = db.Column(db.DateTime, default = datetime.now())
+    name = db.Column(db.String(100))
+    series_uid = db.Column(db.String(70))
     sickness = db.Column(db.String(100))
 
     id_study= db.Column(db.Integer,  db.ForeignKey('study.id'))
-    id_modality= db.Column(db.Integer,  db.ForeignKey('modality.id'))
-
     study = db.relationship('Study', backref='series')
+
+    id_modality= db.Column(db.Integer,  db.ForeignKey('modality.id'))
     modality  =  db.relationship('Modality',backref='series') 
 
 
@@ -68,23 +85,13 @@ class Region(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100))
     description = db.Column(db.String(100),default = 'To be updated')
-    # id_qib_feature = db.Column(db.Integer, db.ForeignKey('qib_feature.id'))
-    # id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
-    
-    # qib_feature = db.relationship('QIBFeature',backref='region')
-    # patient  =  db.relationship('Patient',backref='region')
 
 class Outcome(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    outcome = db.Column(db.String(100))
-    cancer = db.Column(db.Boolean)
-    life_expectancy = db.Column(db.Integer)
-
-    id_region = db.Column(db.Integer, db.ForeignKey('region.id'))
-    region = db.relationship('Region', backref='outcome')
+    plc_status = db.Column(db.Integer)
 
     id_patient = db.Column(db.Integer, db.ForeignKey('patient.id'))
-    patient = db.relationship('Patient', backref='outcome')
+    patient = db.relationship('Patient', backref=db.backref('outcome', uselist=False))
 
 class Family(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -103,6 +110,7 @@ class QIB(db.Model):
 
     id_album = db.Column(db.Integer, db.ForeignKey('album.id'))
     time_stamp = db.Column(db.DateTime, default = datetime.now())
+    saved_search = db.Column(db.Integer, default = 0)
 
     album = db.relationship('Album',backref='qib')
     def __init__(self, id_album):
