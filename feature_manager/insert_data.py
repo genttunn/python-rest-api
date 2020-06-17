@@ -1,4 +1,4 @@
-from feature_manager.models import *
+from feature_manager import models,db
 
 # def insert_family():
 #     family_texture = Family(name='texture')
@@ -8,6 +8,6 @@ from feature_manager.models import *
 
 
 def test_load():
-    album = Album.query.filter_by(name='test_album_1').first()
-    db.session.add(family)
+    album = models.Album.query.filter_by(name='test_album_1').first()
+    db.session.add(album)
     db.session.commit()

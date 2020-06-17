@@ -1,7 +1,7 @@
 from feature_manager import db
 from datetime import datetime
 
-
+default_string = "To be updated"
 
 class Patient(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -41,12 +41,12 @@ class Album(db.Model):
 class Modality(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100))
-    description = db.Column(db.String(100),default = 'To be updated')
+    description = db.Column(db.String(100),default = default_string)
 
 
 class Study(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    name = db.Column(db.String(300))
+    name = db.Column(db.String(300),default = default_string)
     time_stamp = db.Column(db.DateTime, default = datetime.now())
     id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
     patient = db.relationship('Patient', backref='study')
@@ -62,9 +62,9 @@ class StudyAlbum(db.Model):
 class Series(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     time_stamp = db.Column(db.DateTime, default = datetime.now())
-    name = db.Column(db.String(100))
+    name = db.Column(db.String(100),default = default_string)
     series_uid = db.Column(db.String(70))
-    sickness = db.Column(db.String(100))
+    sickness = db.Column(db.String(100),default = default_string)
 
     id_study= db.Column(db.Integer,  db.ForeignKey('study.id'))
     study = db.relationship('Study', backref='series')
@@ -84,7 +84,7 @@ class SeriesRegion(db.Model):
 class Region(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100))
-    description = db.Column(db.String(100),default = 'To be updated')
+    description = db.Column(db.String(100),default = default_string)
 
 class Outcome(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
@@ -107,14 +107,16 @@ class Feature(db.Model):
 class QIB(db.Model):
     __tablename__ = 'qib'
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-
+    name = db.Column(db.String(100), default = default_string)
+    description = db.Column(db.String(500), default = default_string)
     id_album = db.Column(db.Integer, db.ForeignKey('album.id'))
     time_stamp = db.Column(db.DateTime, default = datetime.now())
-    saved_search = db.Column(db.Integer, default = 0)
 
     album = db.relationship('Album',backref='qib')
-    def __init__(self, id_album):
+    def __init__(self, id_album, qib_name, qib_description):
         self.id_album = id_album
+        self.name = qib_name
+        self.description = qib_description
         self.time_stamp = datetime.now()
 
 class QIBFeature(db.Model):
