@@ -26,7 +26,12 @@ data_csv = pd.read_csv("./csv/features_texture.csv")
 current_dir = str(os.path.abspath(os.path.dirname(__file__)))
 
 default_string = "To be updated"
-
+raw_csv_metadata_columns = ['PatientID', 'Modality', 'Label', 'ROI']
+custom_csv_metadata_columns = ['PatientName', 'plc_status','Modality','ROI','Series_region']
+csv_column_name_dict = {
+  "patient": "",
+  "modality": "",
+}
 
 @app.route('/albums', methods=['GET'])
 def get_albums():
@@ -80,17 +85,8 @@ def get_qibs():
 def get_qib_features_by_qib(qib_id):
     all_qib_features = models.QIBFeature.query.filter_by(id_qib=qib_id).all()
     df = convert_to_df(all_qib_features)
-    results = []
-    for i in df.columns:
-        new_dict = {}
-        new_dict['column_name'] = i
-        values = []
-        for a in df[i]:
-            values.append(a)
-        new_dict['values'] = values
-        results.append(new_dict)
     return df.to_json(orient='records')
-    # return jsonify(results)
+
 
 @app.route('/qib_features/region/<region_id>', methods=['GET'])
 def get_qib_features_by_region(region_id):
@@ -161,7 +157,8 @@ def upload_csv():
         if request.method == 'POST' and request.files:
             print('yes')
             data = pd.read_csv(request.files[file_name])
-            load_file_to_db(data,album_name,family,qib_name,qib_description)
+            # load_file_to_db(data,album_name,family,qib_name,qib_description)
+            load_custom_filter_csv_to_db(data,qib_name,qib_description)
             print(data)
         return 'Upload ok'
     except Exception:
@@ -177,6 +174,17 @@ def get_studies_by_album(album_id):
     results = models.studies_schema.dump(studies)
     return jsonify(results)
 
+@app.route('/qib_features/qib/<qib_id>', methods=['PUT'])
+def edit_album(qib_id):
+    if request.json:
+        content = request.json
+        qib = models.QIB.query.filter_by(id = qib_id).first()
+        qib.name = content['name']
+        qib.description = content['description']
+        db.session.commit()
+    return "OK"
+
+
 @app.route("/", methods=['GET'])
 def hello():
     return 'Hello'
@@ -187,11 +195,11 @@ def hello():
 def convert_to_df(qib_feature_set):
     current_feature_name = ''
     feature_dict = {}
-    feature_dict['patientName'] = []
+    feature_dict['PatientName'] = []
     feature_dict['plc_status'] = []
-    feature_dict['modality'] = []
+    feature_dict['Modality'] = []
     feature_dict['ROI'] = []
-    
+    feature_dict['Series_region']=[]
     count=0
     for qb in qib_feature_set:
         if(qb.feature.name != current_feature_name):
@@ -201,13 +209,14 @@ def convert_to_df(qib_feature_set):
         if current_feature_name in feature_dict:
             feature_dict[current_feature_name].append(qb.feature_value)
             if(count<2):
-                feature_dict['modality'].append(qb.series_region.series.modality.name)
+                feature_dict['Modality'].append(qb.series_region.series.modality.name)
                 feature_dict['ROI'].append(qb.series_region.region.name)
-                feature_dict['patientName'].append(qb.series_region.series.study.patient.first_name + '_' + qb.series_region.series.study.patient.last_name)
+                feature_dict['PatientName'].append(qb.series_region.series.study.patient.first_name + '_' + qb.series_region.series.study.patient.last_name)
                 feature_dict['plc_status'].append(qb.series_region.series.study.patient.outcome.plc_status)
-    print(len(feature_dict['modality']))
+                feature_dict['Series_region'].append(qb.series_region.id)
+    print(len(feature_dict['Modality']))
     print(len(feature_dict['ROI']))
-    print(len(feature_dict['patientName']))
+    print(len(feature_dict['PatientName']))
     print(len(feature_dict['plc_status']))
     df = pd.DataFrame(data=feature_dict)
     return df
@@ -262,7 +271,14 @@ def add_mock_studies_for_patient(patient_id):
 def add_patients(data):
     # ex: PatientLC_16_20161005
     print('add_patients')
-    for i in data["PatientID"]:
+    patient_column_name = ''
+    if 'PatientName' in data.columns:
+        patient_column_name = 'PatientName'
+    elif 'PatientID' in data.columns:
+        patient_column_name = 'PatientID'
+    print(patient_column_name)
+    for i in data[patient_column_name]:
+        print('oi')
         extracted_name = i.split('_') 
         first_name = extracted_name[0]
         # we use last name as patient number for now, update later
@@ -273,15 +289,19 @@ def add_patients(data):
             db.session.add(patient)
             db.session.flush()
             add_mock_studies_for_patient(patient.id)
+        print(patient.id)
+    
 
 
+
+ 
 
 def add_features(data , family):
     print('add_feature')
     family = models.Family.query.filter_by(name=family).first()
     for i in data.columns:
         feature = models.Feature.query.filter_by(name=i).first()
-        if feature is None and i not in ['PatientID', 'Modality', 'Label', 'ROI']:
+        if feature is None and i not in raw_csv_metadata_columns  and i not in custom_csv_metadata_columns:
             feature = models.Feature( name = i , id_family = family.id)
             db.session.add(feature)
 
@@ -318,9 +338,12 @@ def add_series_and_studies_commit(data):
     db.session.commit()
     data_out['study'] = study_column
     data_out['series'] = series_column
-    data_out['series_region'] = series_region_column
+    data_out['Series_region'] = series_region_column
     
     return data_out
+
+
+
 def testy():
     data = pd.read_csv("./csv/features_album_Lymphangitis_Texture-Intensity_PT_GTV_N.csv")
     for index, row in data.iterrows():
@@ -332,16 +355,7 @@ def testy():
         modality = models.Modality.query.filter_by(name = row.Modality).first()
         print(modality.name)
 
-def random_study(patient_id):
-    patient = models.Patient.query.filter_by(id=patient_id).first()
-    print(f"patient: {patient.last_name}")
-    studies = models.Study.query.filter_by(id_patient = patient.id)
-    print(studies)
-    row_count = int(studies.count())
-    print(row_count)
-    rand = random.randrange(0, row_count) 
-    random_study = db.session.query(models.Study)[rand]
-    print(f"Random study number: {random_study.name}")
+
 
 #  from feature_manager.routes import *
 
@@ -354,12 +368,12 @@ def add_outcome(data):
     db.session.commit()
 
 
-
 def add_qib_features_commit(data, qib_id):
     print('add_qib_features')
     series_region = []
-    for i in data["series_region"]:
+    for i in data["Series_region"]:
         series_region.append(i)
+    print(len(data.columns))
     for i in data.columns:
         index_series_region = 0
         feature = models.Feature.query.filter_by(name=i).first()
@@ -383,12 +397,25 @@ def load_file_to_db(data,album_name,family,qib_name,qib_description):
     data_appended = add_series_and_studies_commit(data)
     add_qib_features_commit(data_appended, qib.id)
 
+def load_custom_filter_csv_to_db(data,qib_name,qib_description):
+    print('load filter')
+    album = get_album_by_name_commited("custom_qibs")
+    qib = add_qib_for_album_commited(album.id,qib_name,qib_description)
+    add_modalities(data)
+    add_regions(data)
+    add_patients(data)
+    add_features(data,'texture')
+    db.session.commit()
+    add_qib_features_commit(data, qib.id)
+
 def custom_album():
     alb = models.Album(name = "custom_qibs", description = "for saved searches")
     db.session.add(alb)
     db.session.commit()
+    
 
 def insert_data():
+    custom_album()
     family_texture = models.Family.query.filter_by(name='texture').first()
     family_intensity = models.Family.query.filter_by(name='intensity').first()
     if family_texture is None or family_intensity is None:
@@ -442,6 +469,7 @@ def generate_qib_csv(feature_list):
     df.to_csv(file, index=False)
     return file
 
+# def load_csv_column_names_to_dict(data):
 
 
 # def test_gen_modality():
@@ -559,3 +587,25 @@ def generate_qib_csv(feature_list):
 
 #     return data_out
 
+# def random_study(patient_id):
+#     patient = models.Patient.query.filter_by(id=patient_id).first()
+#     print(f"patient: {patient.last_name}")
+#     studies = models.Study.query.filter_by(id_patient = patient.id)
+#     print(studies)
+#     row_count = int(studies.count())
+#     print(row_count)
+#     rand = random.randrange(0, row_count) 
+#     random_study = db.session.query(models.Study)[rand]
+#     print(f"Random study number: {random_study.name}")
+
+
+
+# def load_csv_column_names_to_dict(data):
+#      if 'PatientName' in data.columns:
+#         csv_column_name_dict['patient'] = 'PatientName'
+#      if 'PatientID' in data.columns:
+#         csv_column_name_dict['patient'] = 'PatientID'
+#      if 'Modality' in data.columns:
+#         csv_column_name_dict['modality'] = 'PatientName'
+#      if 'PatientID' in data.columns:
+#         csv_column_name_dict['patient'] = 'PatientID'
