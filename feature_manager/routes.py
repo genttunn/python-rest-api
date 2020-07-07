@@ -64,6 +64,13 @@ def get_modality(modality_id):
     results = modality_schema.dump(modality)
     return jsonify(results)
 
+@app.route('/features/<qib_id>', methods=['GET'])
+def get_features(qib_id):
+    all_features_of_qib = db.session.query(models.QIBFeature.id_feature).filter(models.QIBFeature.id_qib == qib_id).subquery()
+    features = db.session.query(models.Feature).filter(models.Feature.id.in_(all_features_of_qib))
+    results = features_schema.dump(features)
+    return jsonify(results)
+
 @app.route('/qibs/', methods=['GET'])
 def get_qibs():
     album = request.args.get('album', default = 0, type = int)
@@ -73,7 +80,10 @@ def get_qibs():
     if(album!=0 and region==0 and date=='*'):
         all_qibs = models.QIB.query.filter_by(id_album=album).all()
     elif(album==0 and region!=0 and date=='*'):
-        all_qibs = models.QIB.query.join(models.QIBFeature, models.QIB.id == models.QIBFeature.id_qib).join(models.SeriesRegion, models.QIBFeature.id_series_region == models.SeriesRegion.id).join(models.Region, models.Region.id == models.SeriesRegion.id_region).filter(models.Region.id == region).all()
+        all_qibs = models.QIB.query.join(models.QIBFeature, models.QIB.id == models.QIBFeature.id_qib)\
+            .join(models.SeriesRegion, models.QIBFeature.id_series_region == models.SeriesRegion.id)\
+            .join(models.Region, models.Region.id == models.SeriesRegion.id_region)\
+            .filter(models.Region.id == region).all()
     elif(album==0 and region==0 and date!='*'):
         all_qibs = models.QIB.query.filter(models.QIB.time_stamp >= datetime.strptime(date, '%Y-%m-%d %H:%M:%S.%f')).all()
     else:
@@ -87,56 +97,30 @@ def get_qib_features_by_qib(qib_id):
     df = convert_to_df(all_qib_features)
     return df.to_json(orient='records')
 
-
-@app.route('/qib_features/region/<region_id>', methods=['GET'])
-def get_qib_features_by_region(region_id):
-    region = models.Region.query.filter_by(id = region_id).first()
-    if region != None:
-        all_qib_features = models.QIBFeature.query.filter(models.QIBFeature.series_region.has(models.SeriesRegion.id_region == region.id)).all()
-        print(len(all_qib_features))
-        df = convert_to_df(all_qib_features)
-        results = []
-        for i in df.columns:
-            new_dict = {}
-            new_dict['column_name'] = i
-            values = []
-            for a in df[i]:
-                values.append(a)
-            new_dict['values'] = values
-            results.append(new_dict)
-    return jsonify(results)
+@app.route('/statistics/', methods=['GET'])
+def get_statistics():
+    series = db.session.query(models.Series.id).count()
+    studies = db.session.query(models.Study.id).count()
+    patients = db.session.query(models.Patient.id).count()
+    qibs = db.session.query(models.QIB.id).count()
+    stat_dict = {}
+    stat_dict['series'] = series
+    stat_dict['studies'] = studies
+    stat_dict['patients'] = patients
+    stat_dict['qibs'] = qibs
+    return jsonify(stat_dict)
 
 
-@app.route('/qib_features/modality/<modality_id>', methods=['GET'])
-def get_qib_features_by_modality(modality_id):
-    modality = models.Modality.query.filter_by(id = modality_id).first()
-    if modality != None:
-        #  = s.query(Parent).join(Child, Parent.child).filter(Child.value > 20)
-        all_qib_features = models.QIBFeature.query.join(models.SeriesRegion, models.QIBFeature.id_series_region == models.SeriesRegion.id).join(models.Series, models.SeriesRegion.id_series == models.Series.id).filter(models.Series.id_modality == modality.id).all()
-        print(len(all_qib_features))
-        df = convert_to_df(all_qib_features)
-        results = []
-        for i in df.columns:
-            new_dict = {}
-            new_dict['column_name'] = i
-            values = []
-            for a in df[i]:
-                values.append(a)
-            new_dict['values'] = values
-            results.append(new_dict)
-    return jsonify(results)
+@app.route('/chart/scatterplot/<qib_id>/<feature_1>/<feature_2>', methods=['GET'])
+def generate_scatterplot_data(qib_id, feature_1, feature_2):
+    feature_1 = models.Feature.query.filter_by(id = feature_1).scalar()
+    feature_2 = models.Feature.query.filter_by(id = feature_2).scalar()
+    all_qib_features = models.QIBFeature.query.filter(models.QIBFeature.id_qib == qib_id)\
+         .filter((models.QIBFeature.feature == feature_1) | (models.QIBFeature.feature == feature_2)).all()
+    df = convert_to_scatter_coords(all_qib_features,feature_1,feature_2)
+    return df.to_json(orient='values')
 
 
-
-@app.route('/generate_csv/<qib_id>', methods=['POST'])
-def generate_csv_by_feature(qib_id):
-    data = request.json
-    features = data['features']
-    feature_list = features[1:].split(',')
-    file_dir = generate_qib_csv(feature_list)
-    res = {}
-    res['path'] = file_dir
-    return  jsonify(res)
 
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
@@ -164,16 +148,6 @@ def upload_csv():
     except Exception:
         return 'Upload failed'
 
-@app.route('/studies/<album_id>', methods=['GET'])
-def get_studies_by_album(album_id):
-    studies = []
-    study_albums = models.StudyAlbum.query.filter_by(id_album=album_id).all()
-    for sa in study_albums:
-        study = sa.study
-        studies.append(study)
-    results = models.studies_schema.dump(studies)
-    return jsonify(results)
-
 @app.route('/qib_features/qib/<qib_id>', methods=['PUT'])
 def edit_album(qib_id):
     if request.json:
@@ -181,14 +155,32 @@ def edit_album(qib_id):
         qib = models.QIB.query.filter_by(id = qib_id).first()
         qib.name = content['name']
         qib.description = content['description']
+        qib.outcome_column = content['outcome_column']
         db.session.commit()
     return "OK"
 
 
-@app.route("/", methods=['GET'])
-def hello():
-    return 'Hello'
+@app.route('/qib_features/qib/tag/outcome/<qib_id>', methods=['PUT'])
+def tag_outcome(qib_id):
+    if request.json:
+        content = request.json
+        print( content['outcome_column'])
+        qib = models.QIB.query.filter_by(id = qib_id).first()
+        qib.outcome_column = content['outcome_column']
+        db.session.commit()
+        results = qib_schema.dump(qib)
+        return jsonify(results)
 
+
+
+@app.route('/qib_features/qib/tag/metadata/<qib_id>/', methods=['PUT'])
+def tag_metadata(qib_id):
+    if request.json:
+        content = request.json
+        qib = models.QIB.query.filter_by(id = qib_id).first()
+        qib.metadata_columns = content['metadata_columns']
+        db.session.commit()
+    return "OK"
 
 
 ################# Helper functions #####################
@@ -221,6 +213,24 @@ def convert_to_df(qib_feature_set):
     df = pd.DataFrame(data=feature_dict)
     return df
 
+def convert_to_scatter_coords(all_qib_features, feature_1, feature_2):
+    feature_dict = {}
+    feature_dict[feature_1.name] = [feature_1.name]
+    feature_dict[feature_2.name] = [feature_2.name]
+    feature_dict['plc_status'] = ['plc_status']
+    for qf in all_qib_features:
+        plc_status = qf.series_region.series.study.patient.outcome.plc_status
+        if qf.feature == feature_1: 
+            feature_dict[feature_1.name].append(qf.feature_value)
+            feature_dict['plc_status'].append(plc_status)
+        elif qf.feature == feature_2: 
+            feature_dict[feature_2.name].append(qf.feature_value)
+    print('oi')
+    print(feature_dict[feature_1.name])
+    print(feature_dict[feature_2.name])
+    print(feature_dict['plc_status'])
+    df = pd.DataFrame(data=feature_dict)
+    return df
 
 # load csv
 def get_album_by_name_commited(album_name):

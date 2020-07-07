@@ -28,7 +28,7 @@ class PatientSchema(ma.Schema):
 
 class QIBSchema(ma.Schema):
     class Meta:
-        fields = ('id','time_stamp', 'album','name','description')
+        fields = ('id','time_stamp', 'album','name','description','outcome_column','metadata_columns')
     album = ma.Nested(AlbumSchema)
 
 class SeriesSchema(ma.Schema):

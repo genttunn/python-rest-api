@@ -109,6 +109,8 @@ class QIB(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100), default = default_string)
     description = db.Column(db.String(500), default = default_string)
+    outcome_column = db.Column(db.String(200), default = '')
+    metadata_columns = db.Column(db.String(200), default = '')
     id_album = db.Column(db.Integer, db.ForeignKey('album.id'))
     time_stamp = db.Column(db.DateTime, default = datetime.now())
 
