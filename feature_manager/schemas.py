@@ -17,13 +17,18 @@ class RegionSchema(ma.Schema):
     class Meta:
         fields = ('id', 'name', 'description')
 
+class OutcomeSchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'plc_status', 'id_patient')
+
 class ModalitySchema(ma.Schema):
     class Meta:
         fields = ('id', 'name', 'description')
 
 class PatientSchema(ma.Schema):
     class Meta:
-        fields = ('id', 'first_name','last_name', 'birthdate','gender')
+        fields = ('id', 'first_name','last_name', 'birthdate','gender', 'outcome')
+    outcome = ma.Nested(OutcomeSchema)
 
 
 class QIBSchema(ma.Schema):

@@ -5,22 +5,36 @@ import os
 from pydicom.uid import generate_uid
 from datetime import datetime
 import random
+
+##################################### INSTANTIATE SCHEMAS #############################################
+
 region_schema = schemas.RegionSchema()
 regions_schema = schemas.RegionSchema(many=True)
+
 modality_schema = schemas.ModalitySchema()
 modalities_schema = schemas.ModalitySchema(many=True)
+
 family_schema = schemas.FamilySchema()
 families_schema = schemas.FamilySchema(many=True)
+
 feature_schema = schemas.FeatureSchema()
 features_schema = schemas.FeatureSchema(many=True)
+
 qib_feature_schema = schemas.QIBFeatureSchema()
 qib_features_schema = schemas.QIBFeatureSchema(many=True)
+
 qib_schema = schemas.QIBSchema()
 qibs_schema = schemas.QIBSchema(many=True)
 
 album_schema = schemas.AlbumSchema()
 albums_schema = schemas.AlbumSchema(many=True)
 
+patient_schema = schemas.PatientSchema()
+patients_schema = schemas.PatientSchema(many=True)
+
+########################################################################################################
+
+#################################### MISCHELLANEOUS ####################################################
 
 data_csv = pd.read_csv("./csv/features_texture.csv")
 current_dir = str(os.path.abspath(os.path.dirname(__file__)))
@@ -33,36 +47,126 @@ csv_column_name_dict = {
   "modality": "",
 }
 
+########################################################################################################
+
+#################################### DEFINE ROUTES  ####################################################
+
+############### ALBUMS
+
 @app.route('/albums', methods=['GET'])
 def get_albums():
     all_albums = models.Album.query.all()
     results = albums_schema.dump(all_albums)
     return jsonify(results)
 
-@app.route('/region', methods=['GET'])
-def get_regions():
-    regions = models.Region.query.all()
-    results = regions_schema.dump(regions)
+@app.route('/albums', methods=['POST'])
+def new_album():
+    try:
+        if request.json:
+            content = request.json
+            album = models.Album(content['name'],content['description'])
+            db.session.add(album)
+            db.session.commit()
+        return jsonify("OK")
+    except Exception as err:
+        return jsonify(f"{err.__class__.__name__}: {err}")
+
+@app.route('/albums/<album_id>', methods=['PUT'])
+def edit_album(album_id):
+    try:
+        if request.json:
+            content = request.json
+            album = models.Album.query.filter_by(id = album_id).first()
+            album.name = content['name']
+            album.description = content['description']
+            db.session.commit()
+        return jsonify("OK")
+    except Exception as err:
+        return jsonify(f"{err.__class__.__name__}: {err}")
+
+
+@app.route('/albums/<album_id>', methods=['DELETE'])
+def delete_album(album_id):
+    try:
+        qibs = models.QIB.query.filter_by(id_album = album_id).all()
+        print(qibs)
+        if len(qibs) > 0: 
+            return jsonify("Album has children QIBs. Cannot delete.")
+        album = models.Album.query.filter_by(id = album_id).first()
+        db.session.delete(album)
+        db.session.commit()
+        return jsonify("OK")
+    except Exception as err:
+        return jsonify(f"{err.__class__.__name__}: {err}")
+
+##########################
+
+############### PATIENTS
+
+@app.route('/patients', methods=['GET'])
+def get_patients():
+    all_patients = models.Patient.query.all()
+    results = patients_schema.dump(all_patients)
     return jsonify(results)
 
-@app.route('/region/<region_id>', methods=['GET'])
-def get_region(region_id):
-    region = models.Region.query.filter_by(id = region_id).first()
-    results = region_schema.dump(region)
-    return jsonify(results)
+@app.route('/patients/<patient_id>', methods=['PUT'])
+def edit_patient(patient_id):
+    if request.json:
+        content = request.json
+        patient = models.Patient.query.filter_by(id = patient_id).first()
+        patient.first_name = content['first_name']
+        patient.last_name = content['last_name']
+        patient.birthdate = datetime.strptime(content['birthdate'], '%Y-%m-%d')
+        patient.gender = content['gender']
+        outcome = models.Outcome.query.filter_by(id_patient = patient_id).first()
+        outcome.plc_status = content['plc_status']
+        db.session.commit()
+    return jsonify("OK")
 
+##########################
 
-@app.route('/modality', methods=['GET'])
+############### MODALITIES AND REGIONS
+@app.route('/modalities', methods=['GET'])
 def get_modalities():
-    modalities = models.Modality.query.all()
-    results = modalities_schema.dump(modalities)
+    all_modalities = models.Modality.query.all()
+    results = modalities_schema.dump(all_modalities)
     return jsonify(results)
 
-@app.route('/modality/<modality_id>', methods=['GET'])
-def get_modality(modality_id):
-    modality = models.Modality.query.filter_by(id = modality_id).first()
-    results = modality_schema.dump(modality)
+@app.route('/regions', methods=['GET'])
+def get_regions():
+    all_regions = models.Region.query.all()
+    results = regions_schema.dump(all_regions)
     return jsonify(results)
+
+@app.route('/modalities/<modality_id>', methods=['PUT'])
+def edit_modality(modality_id):
+    try:
+        if request.json:
+            content = request.json
+            modality = models.Modality.query.filter_by(id = modality_id).first()
+            modality.name = content['name']
+            modality.description = content['description']
+            db.session.commit()
+        return jsonify("OK")
+    except Exception as err:
+        return jsonify(f"{err.__class__.__name__}: {err}")
+
+
+@app.route('/regions/<region_id>', methods=['PUT'])
+def edit_region(region_id):
+    try:
+        if request.json:
+            content = request.json
+            region = models.Region.query.filter_by(id = region_id).first()
+            region.name = content['name']
+            region.description = content['description']
+            db.session.commit()
+        return jsonify("OK")
+    except Exception as err:
+        return jsonify(f"{err.__class__.__name__}: {err}")
+##########################
+
+############### QIBS RELATED
 
 @app.route('/features/<qib_id>', methods=['GET'])
 def get_features(qib_id):
@@ -91,7 +195,67 @@ def get_qibs():
     results = qibs_schema.dump(all_qibs)
     return jsonify(results)
 
-@app.route('/qib_features/qib/<qib_id>', methods=['GET'])
+
+
+@app.route('/qib/<qib_id>', methods=['PUT'])
+def edit_qib(qib_id):
+    if request.json:
+        content = request.json
+        qib = models.QIB.query.filter_by(id = qib_id).first()
+        qib.name = content['name']
+        qib.description = content['description']
+        db.session.commit()
+    return jsonify("OK")
+
+
+@app.route('/qib/<qib_id>', methods=['DELETE'])
+def delete_qib(qib_id):
+    qib_features =  models.QIBFeature.query.filter_by(id_qib = qib_id).all()
+    list_sr_involved = []
+    for qf in qib_features:
+        series_region = models.SeriesRegion.query.filter_by(id = qf.id_series_region).first()
+        if series_region not in list_sr_involved:
+            list_sr_involved.append(series_region)
+    models.QIB.query.filter_by(id = qib_id).delete()
+    db.session.flush()
+    for sr in list_sr_involved:
+        qib_features_left = models.QIBFeature.query.filter_by(id_series_region = sr.id).count()
+        print(qib_features_left)
+        if qib_features_left == 0:
+            db.session.delete(sr)
+    db.session.commit()
+    return jsonify("OK")
+
+##########################
+
+############### TAG OUTCOMES AND METADATA
+@app.route('/qib/tag/outcome/<qib_id>', methods=['PUT'])
+def tag_outcome(qib_id):
+    if request.json:
+        content = request.json
+        print( content['outcome_column'])
+        qib = models.QIB.query.filter_by(id = qib_id).first()
+        qib.outcome_column = content['outcome_column']
+        db.session.commit()
+        results = qib_schema.dump(qib)
+        return jsonify(results)
+
+
+
+@app.route('/qib_features/qib/tag/metadata/<qib_id>/', methods=['PUT'])
+def tag_metadata(qib_id):
+    if request.json:
+        content = request.json
+        qib = models.QIB.query.filter_by(id = qib_id).first()
+        qib.metadata_columns = content['metadata_columns']
+        db.session.commit()
+    return jsonify("OK")
+
+##########################
+
+############### GENERATE TABLES, CHARTS AND STATS IN JSON
+
+@app.route('/qib_features/<qib_id>', methods=['GET'])
 def get_qib_features_by_qib(qib_id):
     all_qib_features = models.QIBFeature.query.filter_by(id_qib=qib_id).all()
     df = convert_to_df(all_qib_features)
@@ -120,8 +284,9 @@ def generate_scatterplot_data(qib_id, feature_1, feature_2):
     df = convert_to_scatter_coords(all_qib_features,feature_1,feature_2)
     return df.to_json(orient='values')
 
+##########################
 
-
+############### UPLOAD CSV
 @app.route('/upload_csv', methods=['POST'])
 def upload_csv():
     try:
@@ -144,46 +309,18 @@ def upload_csv():
             # load_file_to_db(data,album_name,family,qib_name,qib_description)
             load_custom_filter_csv_to_db(data,qib_name,qib_description)
             print(data)
-        return 'Upload ok'
+        return jsonify('Upload ok')
     except Exception:
-        return 'Upload failed'
+        return jsonify('Upload failed')
 
-@app.route('/qib_features/qib/<qib_id>', methods=['PUT'])
-def edit_album(qib_id):
-    if request.json:
-        content = request.json
-        qib = models.QIB.query.filter_by(id = qib_id).first()
-        qib.name = content['name']
-        qib.description = content['description']
-        qib.outcome_column = content['outcome_column']
-        db.session.commit()
-    return "OK"
+##########################
 
+@app.route('/', methods=['GET'])
+def greet():
+    return jsonify('Hello. This is the API for the feature manager.')
+########################################################################################################
 
-@app.route('/qib_features/qib/tag/outcome/<qib_id>', methods=['PUT'])
-def tag_outcome(qib_id):
-    if request.json:
-        content = request.json
-        print( content['outcome_column'])
-        qib = models.QIB.query.filter_by(id = qib_id).first()
-        qib.outcome_column = content['outcome_column']
-        db.session.commit()
-        results = qib_schema.dump(qib)
-        return jsonify(results)
-
-
-
-@app.route('/qib_features/qib/tag/metadata/<qib_id>/', methods=['PUT'])
-def tag_metadata(qib_id):
-    if request.json:
-        content = request.json
-        qib = models.QIB.query.filter_by(id = qib_id).first()
-        qib.metadata_columns = content['metadata_columns']
-        db.session.commit()
-    return "OK"
-
-
-################# Helper functions #####################
+########################################### HELPER FUNCTIONS ##########################################
 def convert_to_df(qib_feature_set):
     current_feature_name = ''
     feature_dict = {}
@@ -201,37 +338,34 @@ def convert_to_df(qib_feature_set):
         if current_feature_name in feature_dict:
             feature_dict[current_feature_name].append(qb.feature_value)
             if(count<2):
-                feature_dict['Modality'].append(qb.series_region.series.modality.name)
-                feature_dict['ROI'].append(qb.series_region.region.name)
                 feature_dict['PatientName'].append(qb.series_region.series.study.patient.first_name + '_' + qb.series_region.series.study.patient.last_name)
                 feature_dict['plc_status'].append(qb.series_region.series.study.patient.outcome.plc_status)
+                feature_dict['Modality'].append(qb.series_region.series.modality.name)
+                feature_dict['ROI'].append(qb.series_region.region.name)
                 feature_dict['Series_region'].append(qb.series_region.id)
-    print(len(feature_dict['Modality']))
-    print(len(feature_dict['ROI']))
-    print(len(feature_dict['PatientName']))
-    print(len(feature_dict['plc_status']))
     df = pd.DataFrame(data=feature_dict)
     return df
 
-def convert_to_scatter_coords(all_qib_features, feature_1, feature_2):
+def convert_to_scatter_coords(qib_features, feature_1, feature_2):
     feature_dict = {}
     feature_dict[feature_1.name] = [feature_1.name]
     feature_dict[feature_2.name] = [feature_2.name]
     feature_dict['plc_status'] = ['plc_status']
-    for qf in all_qib_features:
+    for qf in qib_features:
         plc_status = qf.series_region.series.study.patient.outcome.plc_status
         if qf.feature == feature_1: 
             feature_dict[feature_1.name].append(qf.feature_value)
             feature_dict['plc_status'].append(plc_status)
         elif qf.feature == feature_2: 
             feature_dict[feature_2.name].append(qf.feature_value)
-    print('oi')
     print(feature_dict[feature_1.name])
     print(feature_dict[feature_2.name])
     print(feature_dict['plc_status'])
     df = pd.DataFrame(data=feature_dict)
     return df
+########################################################################################################
 
+########################################### CSV ETL PROCESS ############################################
 # load csv
 def get_album_by_name_commited(album_name):
     print('get_album_by_name_commited')
@@ -302,10 +436,6 @@ def add_patients(data):
         print(patient.id)
     
 
-
-
- 
-
 def add_features(data , family):
     print('add_feature')
     family = models.Family.query.filter_by(name=family).first()
@@ -315,7 +445,11 @@ def add_features(data , family):
             feature = models.Feature( name = i , id_family = family.id)
             db.session.add(feature)
 
-def add_series_and_studies_commit(data):
+
+
+
+
+def add_series_and_studies_commit(data, album):
     print('add_series_and_studies')
     data_out = data
     study_column = []
@@ -330,6 +464,10 @@ def add_series_and_studies_commit(data):
         studies = models.Study.query.filter_by(id_patient = patient.id)
         row_count = int(studies.count())
         random_study = studies.offset(int(row_count*random.random())).first()
+        study_album = models.StudyAlbum.query.filter_by(id_study = random_study.id , id_album = album.id).first()
+        if study_album is None:
+                study_album = models.StudyAlbum(id_study = random_study.id , id_album = album.id)
+                db.session.add(study_album)
         print(f"Random study number: {random_study.name}")
         #create Series for Study
         modality = models.Modality.query.filter_by(name = row.Modality).first()
@@ -351,23 +489,6 @@ def add_series_and_studies_commit(data):
     data_out['Series_region'] = series_region_column
     
     return data_out
-
-
-
-def testy():
-    data = pd.read_csv("./csv/features_album_Lymphangitis_Texture-Intensity_PT_GTV_N.csv")
-    for index, row in data.iterrows():
-        series = models.Series.query.filter_by(name = row.PatientID).first()
-        extracted_name = row.PatientID.split('_') 
-        last_name = extracted_name[1]
-        patient = models.Patient.query.filter_by(last_name=last_name).first()
-
-        modality = models.Modality.query.filter_by(name = row.Modality).first()
-        print(modality.name)
-
-
-
-#  from feature_manager.routes import *
 
 def add_outcome(data):
     for index, row in data.iterrows():
@@ -396,6 +517,9 @@ def add_qib_features_commit(data, qib_id):
                 index_series_region += 1
     db.session.commit()
 
+########################################################################################################
+
+########################################### LOAD CSV, INSERT DATA ############################################
 def load_file_to_db(data,album_name,family,qib_name,qib_description):
     album = get_album_by_name_commited(album_name)
     qib = add_qib_for_album_commited(album.id,qib_name,qib_description)
@@ -404,7 +528,7 @@ def load_file_to_db(data,album_name,family,qib_name,qib_description):
     add_patients(data)
     add_features(data,family)
     db.session.commit()
-    data_appended = add_series_and_studies_commit(data)
+    data_appended = add_series_and_studies_commit(data, album)
     add_qib_features_commit(data_appended, qib.id)
 
 def load_custom_filter_csv_to_db(data,qib_name,qib_description):
@@ -450,6 +574,12 @@ def insert_data():
     data_csv =  pd.read_csv("./csv/list_patients.csv")
     add_outcome(data_csv)
 
+########################################################################################################
+
+
+
+
+
 def generate_qib_csv(feature_list):
     feature_dict = {}
     all_qib_features = models.QIBFeature.query.filter_by(id_qib=1).all()
@@ -478,6 +608,11 @@ def generate_qib_csv(feature_list):
     file = current_dir + f"\\data\\{str(datetime.now().timestamp())}.csv"
     df.to_csv(file, index=False)
     return file
+
+
+
+
+
 
 # def load_csv_column_names_to_dict(data):
 
@@ -619,3 +754,27 @@ def generate_qib_csv(feature_list):
 #         csv_column_name_dict['modality'] = 'PatientName'
 #      if 'PatientID' in data.columns:
 #         csv_column_name_dict['patient'] = 'PatientID'
+
+# @app.route('/region', methods=['GET'])
+# def get_regions():
+#     regions = models.Region.query.all()
+#     results = regions_schema.dump(regions)
+#     return jsonify(results)
+
+# @app.route('/region/<region_id>', methods=['GET'])
+# def get_region(region_id):
+#     region = models.Region.query.filter_by(id = region_id).first()
+#     results = region_schema.dump(region)
+#     return jsonify(results)
+
+# @app.route('/modality', methods=['GET'])
+# def get_modalities():
+#     modalities = models.Modality.query.all()
+#     results = modalities_schema.dump(modalities)
+#     return jsonify(results)
+
+# @app.route('/modality/<modality_id>', methods=['GET'])
+# def get_modality(modality_id):
+#     modality = models.Modality.query.filter_by(id = modality_id).first()
+#     results = modality_schema.dump(modality)
+#     return jsonify(results)
