@@ -4,8 +4,6 @@ feature_manager/dbparams.py
 #feature set
 data/
 
-#csv
-*.csv
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

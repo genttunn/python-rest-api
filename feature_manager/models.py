@@ -11,22 +11,6 @@ class Patient(db.Model):
     birthdate = db.Column(db.DateTime)
     gender = db.Column(db.String(2))
 
-
-# class Study(db.Model):
-#     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-#     name = db.Column(db.String(300))
-#     id_patient= db.Column(db.Integer,  db.ForeignKey('patient.id'))
-#     time_stamp = db.Column(db.DateTime, default = datetime.now())
-#     patient = db.relationship('Patient', backref='study')
-
-
-# class StudyAlbum(db.Model):
-#     id_study = db.Column(db.Integer, db.ForeignKey('study.id'),primary_key=True)
-#     id_album = db.Column(db.Integer, db.ForeignKey(
-#         'album.id'),primary_key=True)
-#     study = db.relationship('Study', backref='study_album')
-#     album = db.relationship('Album', backref='study_album')
-
 class Album(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     name = db.Column(db.String(100))

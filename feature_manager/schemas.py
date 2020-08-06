@@ -30,7 +30,11 @@ class PatientSchema(ma.Schema):
         fields = ('id', 'first_name','last_name', 'birthdate','gender', 'outcome')
     outcome = ma.Nested(OutcomeSchema)
 
-
+class StudySchema(ma.Schema):
+    class Meta:
+        fields = ('id', 'name', 'time_stamp', 'patient')
+    patient = ma.Nested(PatientSchema)
+    
 class QIBSchema(ma.Schema):
     class Meta:
         fields = ('id','time_stamp', 'album','name','description','outcome_column','metadata_columns')
@@ -54,9 +58,5 @@ class QIBFeatureSchema(ma.Schema):
     qib = ma.Nested(QIBSchema)
     series_region = ma.Nested(SeriesRegionSchema)
 
-
-class AlbumSchema(ma.Schema):
-    class Meta:
-        fields = ('id', 'name','description', 'time_stamp')
 
 
