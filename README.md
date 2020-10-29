@@ -1,6 +1,6 @@
 # python-rest-api
 
-Flask backend to ETL raw CSVs with panda, communicate with database, and provide REST api for managing QIB collections.
+Flask backend to ETL raw CSVs with pandas, communicate with database, and provide REST api for managing QIB collections.
 
 ## Repos
 
