@@ -27,7 +27,7 @@ Type the following commands one by one to create the data model in database and 
 from feature_manager import db<br />
 db.create_all()<br />
 from feature_manager.routes import \*<br />
-<br />
+quick_start()<br />
 
 <br />
 Quit Python console and start the back-end application with python app.py<br />

@@ -547,7 +547,7 @@ def add_patients(data):
         last_name = extracted_name[1]
         patient = models.Patient.query.filter_by(last_name=last_name).first()
         if patient is None:
-            patient = models.Patient(first_name=first_name, last_name=last_name, birthdate='2000-01-01',gender= 'F')
+            patient = models.Patient(first_name=first_name, last_name=last_name, birthdate=datetime.strptime('2000-01-01', '%Y-%m-%d'),gender= 'F')
             db.session.add(patient)
             db.session.flush()
             add_mock_studies_for_patient(patient.id)
